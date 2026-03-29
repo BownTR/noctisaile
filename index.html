@@ -72,6 +72,9 @@
                 map = L.map('map').setView([39, 35], 5);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
             }
+            
+            // Harita görünür olduğunda boyutunu yenile
+            setTimeout(() => { map.invalidateSize(); }, 300);
 
             onValue(ref(database, 'takip_listesi/' + phone), (s) => {
                 const data = s.val();
