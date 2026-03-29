@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel | Aile Takip</title>
+    <link rel="stylesheet" href="index.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="glass-card">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 1.5rem;">
+            <i data-lucide="shield" style="color: var(--accent-primary)"></i>
+            <h1 style="font-size: 1.25rem; margin: 0;">Takip Kontrol Paneli</h1>
+        </div>
+        
+        <input type="text" id="phone-input" class="input-field" placeholder="Telefon (05XXXXXXXXX)">
+        <input type="text" id="name-input" class="input-field" placeholder="Mesaj Başlığı (Örn: Paket Takip)">
+        
+        <button class="btn btn-primary" id="search-btn">
+            <i data-lucide="zap"></i> Link Üret ve İzle
+        </button>
+
+        <div id="link-result" style="display: none; margin-top: 1.5rem;">
+            <div style="font-size: 0.75rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; text-transform: uppercase;">Hazır SMS Taslağı:</div>
+            <div class="message-preview" id="message-preview"></div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button id="copy-btn" class="btn btn-secondary" style="flex: 1;"><i data-lucide="copy"></i> Kopyala</button>
+                <button id="sms-btn" class="btn btn-primary" style="flex: 1; background: #25d366;"><i data-lucide="message-circle"></i> SMS Gönder</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+        import firebaseConfig from './firebase-config.js';
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        lucide.createIcons();
+
+        const searchBtn = document.getElementById('search-btn');
+        const linkResult = document.getElementById('link-result');
+        const preview = document.getElementById('message-preview');
+
+        searchBtn.addEventListener('click', () => {
+            const phone = document.getElementById('phone-input').value.trim();
+            const name = document.getElementById('name-input').value.trim() || "Güvenlik Onayı";
+            if (!phone) return alert("Lütfen bir numara girin!");
+
+            const link = window.location.origin + "/l.html?tel=" + phone + "&n=" + encodeURIComponent(name);
+            const template = `Bu linke tıklayarak konumunuzu paylaşabilirsiniz.\n\n${name}: ${link}`;
+            
+            preview.innerText = template;
+            linkResult.style.display = "block";
+
+            onValue(ref(database, 'takip_listesi/' + phone), (snapshot) => {
+                if (snapshot.val()) console.log("Veri alındı:", snapshot.val());
+            });
+        });
+
+        document.getElementById('copy-btn').onclick = () => {
+            navigator.clipboard.writeText(preview.innerText);
+            alert("Taslak kopyalandı!");
+        };
+
+        document.getElementById('sms-btn').onclick = () => {
+            const phone = document.getElementById('phone-input').value;
+            window.open(`sms:${phone}?body=${encodeURIComponent(preview.innerText)}`);
+        };
+    </script>
+</body>
+</html>
